@@ -578,7 +578,8 @@ final class WindowedSubscriber<T> extends BaseSubscriber<T> {
         private static final String PENDING_KEY = "pending";
         public static final String SIGNAL_TYPE_KEY = "signalType";
         public static final String EMIT_RESULT_KEY = "emitResult";
-        private static final String TERMINATING_WORK = "Terminating the work.";
+        private static final String TERMINATING_SUCCEEDED_WORK = "Terminating the work.";
+        private static final String TERMINATING_WORK = "Terminating the work. {}";
 
         private final AtomicBoolean isInitialized = new AtomicBoolean(false);
         private final AtomicBoolean isCanceled = new AtomicBoolean(false);
@@ -790,23 +791,19 @@ final class WindowedSubscriber<T> extends BaseSubscriber<T> {
                 timers.dispose();
             } finally {
                 if (terminalState == WorkTerminalState.SINK_ERROR) {
-                    withPendingKey(logger.atWarning())
-                        .addKeyValue("reason", "sink-error")
-                        .log(TERMINATING_WORK);
+                    withPendingKey(logger.atWarning()).log(TERMINATING_WORK, "(Reason: sink-error)");
                     return;
                 }
 
                 if (terminalState == WorkTerminalState.CANCELED) {
                     assertCondition(isCanceled(), terminalState);
-                    withPendingKey(logger.atWarning())
-                        .addKeyValue("reason", "sink-canceled")
-                        .log(TERMINATING_WORK);
+                    withPendingKey(logger.atWarning()).log(TERMINATING_WORK, "(Reason: sink-canceled)");
                     return;
                 }
 
                 if (terminalState == WorkTerminalState.RECEIVED_DEMANDED) {
                     assertCondition(hasReceivedDemanded(), terminalState);
-                    withPendingKey(logger.atVerbose()).log(TERMINATING_WORK);
+                    withPendingKey(logger.atVerbose()).log(TERMINATING_SUCCEEDED_WORK);
                     closeWindow();
                     return;
                 }
@@ -824,14 +821,10 @@ final class WindowedSubscriber<T> extends BaseSubscriber<T> {
                     final TimeoutReason reason = timeoutReason.get();
                     final Throwable e = reason.getError();
                     if (e != null) {
-                        withPendingKey(logger.atWarning())
-                            .addKeyValue("reason", reason.getMessage())
-                            .log(TERMINATING_WORK, e);
+                        withPendingKey(logger.atWarning()).log(TERMINATING_WORK, reason.getMessage(), e);
                         closeWindow(e);
                     } else {
-                        withPendingKey(logger.atVerbose())
-                            .addKeyValue("reason", reason.getMessage())
-                            .log(TERMINATING_WORK);
+                        withPendingKey(logger.atVerbose()).log(TERMINATING_WORK, reason.getMessage());
                         closeWindow();
                     }
                     return;
@@ -847,9 +840,7 @@ final class WindowedSubscriber<T> extends BaseSubscriber<T> {
 
                 if (terminalState == WorkTerminalState.PARENT_TERMINAL_CLEAN_CLOSE) {
                     assertCondition(parent.isDoneOrCanceled() && isStreaming(), terminalState);
-                    withPendingKey(logger.atWarning())
-                        .addKeyValue("reason", "terminal-clean-close")
-                        .log(TERMINATING_WORK);
+                    withPendingKey(logger.atWarning()).log(TERMINATING_WORK, "(Reason: terminal-clean-close)");
                     closeWindow();
                     return;
                 }
