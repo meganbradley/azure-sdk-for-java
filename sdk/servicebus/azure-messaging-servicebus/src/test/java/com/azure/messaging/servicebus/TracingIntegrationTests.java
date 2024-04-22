@@ -5,7 +5,6 @@ package com.azure.messaging.servicebus;
 
 import com.azure.core.tracing.opentelemetry.OpenTelemetryTracingOptions;
 import com.azure.core.util.ClientOptions;
-import com.azure.core.util.IterableStream;
 import com.azure.core.util.logging.ClientLogger;
 import com.azure.messaging.servicebus.implementation.instrumentation.ServiceBusTracer;
 import com.azure.messaging.servicebus.models.DeferOptions;
@@ -389,17 +388,20 @@ public class TracingIntegrationTests extends IntegrationTestBase {
 
         StepVerifier.create(sender.sendMessage(message)).expectComplete().verify(TIMEOUT);
 
-        CountDownLatch latch = new CountDownLatch(1);
-        spanProcessor.notifyIfCondition(latch, s -> s.getName().equals("ServiceBus.receiveDeferredMessage"));
+        CountDownLatch latch = new CountDownLatch(3);
+        spanProcessor.notifyIfCondition(latch, s -> (s.getName().equals("ServiceBus.process") || s.getName().equals("ServiceBus.renewMessageLock")) && s.getSpanContext().getTraceId().equals(traceId));
         toClose(receiver.receiveMessages()
-            .filter(m -> traceparent.equals(m.getApplicationProperties().get("traceparent")))
+            .skipUntil(m -> traceparent.equals(m.getApplicationProperties().get("traceparent")))
             .flatMap(m -> receiver.renewMessageLock(m).thenReturn(m))
             .flatMap(m -> receiver.defer(m, new DeferOptions()).thenReturn(m))
             .flatMap(m -> receiver.receiveDeferredMessage(m.getSequenceNumber()).thenReturn(m))
             .subscribe(m -> {
-                receivedMessage.compareAndSet(null, m);
+                if (traceparent.equals(m.getApplicationProperties().get("traceparent"))) {
+                    receivedMessage.compareAndSet(null, m);
+                    latch.countDown();
+                }
             }));
-        assertTrue(latch.await(120, TimeUnit.SECONDS));
+        assertTrue(latch.await(50, TimeUnit.SECONDS));
 
         List<ReadableSpan> spans = spanProcessor.getEndedSpans();
 
@@ -430,13 +432,7 @@ public class TracingIntegrationTests extends IntegrationTestBase {
             .expectComplete()
             .verify(TIMEOUT);
 
-        ServiceBusReceivedMessage receivedMessage = null;
-        while (receivedMessage == null) {
-            IterableStream<ServiceBusReceivedMessage> messages = receiverSync.receiveMessages(1, Duration.ofSeconds(10));
-            if (messages.iterator().hasNext()) {
-                receivedMessage = messages.iterator().next();
-            }
-        }
+        ServiceBusReceivedMessage receivedMessage = receiverSync.receiveMessages(1, Duration.ofSeconds(10)).stream().findFirst().get();
 
         receiverSync.renewMessageLock(receivedMessage);
         receiverSync.defer(receivedMessage, new DeferOptions());
@@ -712,7 +708,7 @@ public class TracingIntegrationTests extends IntegrationTestBase {
             .buildProcessorClient());
         toClose((AutoCloseable) () -> processor.stop());
         processor.start();
-        assertTrue(messageProcessed.await(30, TimeUnit.SECONDS));
+        assertTrue(messageProcessed.await(10, TimeUnit.SECONDS));
         processor.stop();
 
         List<ReadableSpan> spans = spanProcessor.getEndedSpans();

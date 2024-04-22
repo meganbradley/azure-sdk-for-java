@@ -1156,7 +1156,7 @@ public final class ServiceBusClientBuilder implements
         private static final String SESSION_PROCESSOR_ASYNC_RECEIVE_KEY = "com.azure.messaging.servicebus.session.processor.asyncReceive.v2";
         private static final ConfigurationProperty<Boolean> SESSION_PROCESSOR_ASYNC_RECEIVE_PROPERTY = ConfigurationPropertyBuilder.ofBoolean(SESSION_PROCESSOR_ASYNC_RECEIVE_KEY)
             .environmentVariableName(SESSION_PROCESSOR_ASYNC_RECEIVE_KEY)
-            .defaultValue(true) // 'Session' Async[Processor]Receiver Client is on the new v2 stack by default
+            .defaultValue(false) // 'Session' Async[Processor]Receiver Client is not on the new v2 stack by default
             .shared(true)
             .build();
         private final AtomicReference<Boolean> sessionProcessorAsyncReceiveFlag = new AtomicReference<>();
@@ -1164,7 +1164,7 @@ public final class ServiceBusClientBuilder implements
         private static final String SESSION_REACTOR_ASYNC_RECEIVE_KEY = "com.azure.messaging.servicebus.session.reactor.asyncReceive.v2";
         private static final ConfigurationProperty<Boolean> SESSION_REACTOR_ASYNC_RECEIVE_PROPERTY = ConfigurationPropertyBuilder.ofBoolean(SESSION_REACTOR_ASYNC_RECEIVE_KEY)
             .environmentVariableName(SESSION_REACTOR_ASYNC_RECEIVE_KEY)
-            .defaultValue(true) // 'Session' Async[Reactor]Receiver Client is on the new v2 stack by default
+            .defaultValue(false) // 'Session' Async[Reactor]Receiver Client is not on the new v2 stack by default
             .shared(true)
             .build();
         private final AtomicReference<Boolean> sessionReactorAsyncReceiveFlag = new AtomicReference<>();
@@ -1213,23 +1213,23 @@ public final class ServiceBusClientBuilder implements
         }
 
         /**
-         * Session Async ProcessorClient is on the v2 stack by default, but the application may opt out.
+         * Session Async ProcessorClient is not on the v2 stack by default, but the application may opt into the v2 stack.
          *
          * @param configuration the client configuration.
          * @return true if session processor receive should use the v2 stack.
          */
         boolean isSessionProcessorAsyncReceiveEnabled(Configuration configuration) {
-            return !isOptedOut(configuration, SESSION_PROCESSOR_ASYNC_RECEIVE_PROPERTY, sessionProcessorAsyncReceiveFlag);
+            return isOptedIn(configuration, SESSION_PROCESSOR_ASYNC_RECEIVE_PROPERTY, sessionProcessorAsyncReceiveFlag);
         }
 
         /**
-         * Session Async ReactorClient is on the v2 stack by default, but the application may opt out.
+         * Session Async ReactorClient is not on the v2 stack by default, but the application may opt into the v2 stack.
          *
          * @param configuration the client configuration.
          * @return true if session reactor receive should use the v2 stack.
          */
         boolean isSessionReactorAsyncReceiveEnabled(Configuration configuration) {
-            return !isOptedOut(configuration, SESSION_REACTOR_ASYNC_RECEIVE_PROPERTY, sessionReactorAsyncReceiveFlag);
+            return isOptedIn(configuration, SESSION_REACTOR_ASYNC_RECEIVE_PROPERTY, sessionReactorAsyncReceiveFlag);
         }
 
         /**
